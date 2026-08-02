@@ -46,6 +46,13 @@ class DataFetcher:
         if df is None:
             raise RuntimeError(f"Yahoo Finance returned None for {symbol}")
 
+        # Normalize MultiIndex columns returned by newer yfinance versions
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        # Remove any column index name
+        df.columns.name = None
+
         if df.empty:
             raise ValueError(f"No data returned for {symbol}")
 
