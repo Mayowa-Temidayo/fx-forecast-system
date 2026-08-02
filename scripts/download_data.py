@@ -13,7 +13,7 @@ try:
 
     print("5. Downloader imported")
 
-except Exception as e:
+except Exception:
     import traceback
 
     traceback.print_exc()

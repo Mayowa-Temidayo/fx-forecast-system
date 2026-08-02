@@ -1,33 +1,61 @@
+"""
+Data fetching utilities.
+"""
+
 from __future__ import annotations
 
-print("A. fetch.py loaded")
-
+from datetime import datetime
 from pathlib import Path
 
-print("B. pathlib")
-
 import pandas as pd
-
-print("C. pandas")
-
 import yfinance as yf
 
-print("D. yfinance")
-
-from fx_forecast.config.paths import RAW_DATA_DIR
-
-print("E. paths")
-
+from fx_forecast.data.io import save_dataframe
 from fx_forecast.utils.logger import logger
 
-print("F. logger")
 
+class DataFetcher:
+    """Download historical FX data from Yahoo Finance."""
 
-def download_fx_data(
-    ticker: str,
-    start_date: str,
-    interval: str = "1d",
-    overwrite: bool = False,
-) -> Path:
-    print("download_fx_data called")
-    return RAW_DATA_DIR / "test.parquet"
+    def __init__(self, output_dir: Path) -> None:
+        self.output_dir = output_dir
+
+    def download(
+        self,
+        symbol: str,
+        start: str,
+        end: str | None = None,
+        interval: str = "1d",
+    ) -> pd.DataFrame:
+        """Download historical price data."""
+
+        if end is None:
+            end = datetime.today().strftime("%Y-%m-%d")
+
+        logger.info(f"Downloading {symbol} ({start} → {end})")
+
+        df = yf.download(
+            tickers=symbol,
+            start=start,
+            end=end,
+            interval=interval,
+            progress=False,
+            auto_adjust=True,
+        )
+
+        if df is None:
+            raise RuntimeError(f"Yahoo Finance returned None for {symbol}")
+
+        if df.empty:
+            raise ValueError(f"No data returned for {symbol}")
+
+        filename = symbol.replace("=", "_")
+
+        save_dataframe(
+            df=df,
+            path=self.output_dir / filename,
+        )
+
+        logger.success(f"{symbol}: {len(df)} rows downloaded")
+
+        return df
