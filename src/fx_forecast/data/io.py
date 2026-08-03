@@ -10,11 +10,11 @@ import pandas as pd
 
 from fx_forecast.utils.logger import logger
 
-DEFAULT_FORMAT = "csv"  # Change to "parquet" later if desired.
+DEFAULT_FORMAT = "csv"
 
 
 def ensure_directory(path: Path) -> None:
-    """Create directory if it does not exist."""
+    """Create a directory if it does not already exist."""
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -23,18 +23,35 @@ def save_dataframe(
     path: Path,
     file_format: str = DEFAULT_FORMAT,
 ) -> None:
-    """Save a DataFrame."""
+    """
+    Save a DataFrame to disk.
+
+    Parameters
+    ----------
+    df
+        DataFrame to save.
+    path
+        Destination path without relying on the caller to provide
+        the correct suffix.
+    file_format
+        Either "csv" or "parquet".
+    """
+
+    file_format = file_format.lower()
 
     ensure_directory(path.parent)
 
-    if file_format == "parquet":
-        path = path.with_suffix(".parquet")
-        df.to_parquet(path, index=True)
-    elif file_format == "csv":
-        path = path.with_suffix(".csv")
-        df.to_csv(path, index=True)
-    else:
-        raise ValueError(f"Unsupported format: {file_format}")
+    match file_format:
+        case "csv":
+            path = path.with_suffix(".csv")
+            df.to_csv(path, index=True)
+
+        case "parquet":
+            path = path.with_suffix(".parquet")
+            df.to_parquet(path, index=True)
+
+        case _:
+            raise ValueError(f"Unsupported file format: {file_format}")
 
     logger.success(f"Saved dataset -> {path}")
 
@@ -43,14 +60,52 @@ def load_dataframe(
     path: Path,
     file_format: str = DEFAULT_FORMAT,
 ) -> pd.DataFrame:
-    """Load a DataFrame."""
+    """
+    Load a DataFrame from disk.
 
-    if file_format == "parquet":
-        path = path.with_suffix(".parquet")
-        return pd.read_parquet(path)
+    Parameters
+    ----------
+    path
+        File path without requiring the correct suffix.
+    file_format
+        Either "csv" or "parquet".
 
-    if file_format == "csv":
-        path = path.with_suffix(".csv")
-        return pd.read_csv(path, index_col=0)
+    Returns
+    -------
+    pd.DataFrame
+    """
 
-    raise ValueError(f"Unsupported format: {file_format}")
+    file_format = file_format.lower()
+
+    match file_format:
+        case "csv":
+            path = path.with_suffix(".csv")
+
+        case "parquet":
+            path = path.with_suffix(".parquet")
+
+        case _:
+            raise ValueError(f"Unsupported file format: {file_format}")
+
+    if not path.exists():
+        raise FileNotFoundError(path)
+
+    logger.info(f"Loading dataset <- {path}")
+
+    match file_format:
+        case "csv":
+            df = pd.read_csv(
+                path,
+                index_col=0,
+                parse_dates=[0],
+            )
+
+            df.index.name = None
+
+            return df
+
+        case "parquet":
+            return pd.read_parquet(path)
+
+    # Defensive fallback (should never be reached)
+    raise RuntimeError("Unexpected file format.")
