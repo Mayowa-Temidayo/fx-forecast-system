@@ -1,50 +1,47 @@
-"""
-End-to-end data pipeline.
-"""
+"""End-to-end FX data pipeline."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from fx_forecast.config.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
-from fx_forecast.data.fetch import DataFetcher
+from fx_forecast.config.paths import PROCESSED_DATA_DIR
 from fx_forecast.data.io import save_dataframe
 from fx_forecast.data.preprocess import preprocess_dataframe
+from fx_forecast.data.providers.base import FXProvider
 from fx_forecast.data.validate import validate_dataframe
 from fx_forecast.utils.logger import logger
 
 
 def run_pipeline(
-    symbol: str,
+    provider: FXProvider,
+    pair: str,
     start: str,
     end: str | None = None,
-    interval: str = "1d",
 ) -> pd.DataFrame:
-    """
-    Download, validate, preprocess and save market data.
-    """
+    """Fetch, validate, preprocess and save FX market data."""
 
-    logger.info(f"Starting pipeline for {symbol}")
+    logger.info(f"Starting pipeline for {pair}")
 
-    fetcher = DataFetcher(RAW_DATA_DIR)
-
-    df = fetcher.download(
-        symbol=symbol,
+    df = provider.fetch(
+        pair=pair,
         start=start,
         end=end,
-        interval=interval,
     )
 
-    df = validate_dataframe(df)
+    df = validate_dataframe(
+        df,
+        schema=provider.schema,
+    )
+
     df = preprocess_dataframe(df)
 
-    output_path = PROCESSED_DATA_DIR / f"{symbol.replace('=', '_')}.csv"
+    output_path = PROCESSED_DATA_DIR / f"{pair.replace('/', '_')}.csv"
 
     save_dataframe(
         df=df,
         path=output_path,
     )
 
-    logger.success(f"Pipeline completed for {symbol}")
+    logger.success(f"Pipeline completed for {pair}")
 
     return df

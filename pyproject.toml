@@ -18,23 +18,18 @@ dependencies = [
     "pyarrow>=20,<21",
     "polars>=1.33",
     "scipy>=1.15,<1.16",
-
     # Configuration & Logging
     "loguru>=0.7",
     "pydantic>=2.11",
     "pydantic-settings>=2.10",
-
     # Data
     "yfinance>=0.2",
     "pandera>=0.26",
-
     # Feature Engineering
     "ta>=0.11",
-
     # Classical Forecasting
     "statsmodels>=0.14",
     "prophet>=1.1",
-
     # Machine Learning
     "scikit-learn>=1.7",
     "xgboost>=3.0",
@@ -42,10 +37,10 @@ dependencies = [
     "catboost>=1.2",
     "optuna>=4.4",
     "joblib>=1.5",
-
     # Visualization
     "matplotlib>=3.10",
     "plotly>=6.3",
+    "lxml>=6.1.1",
 ]
 
 [dependency-groups]

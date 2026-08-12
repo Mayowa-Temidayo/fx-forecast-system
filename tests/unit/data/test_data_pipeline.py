@@ -4,12 +4,14 @@ Unit tests for the data pipeline.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 from fx_forecast.data.pipeline import run_pipeline
+from fx_forecast.data.providers.base import FXProvider
 
 
 @pytest.fixture
@@ -30,137 +32,127 @@ def sample_dataframe() -> pd.DataFrame:
     )
 
 
+@pytest.fixture
+def mock_provider() -> MagicMock:
+    """Return a mocked FX provider."""
+
+    return MagicMock(spec=FXProvider)
+
+
 @patch("fx_forecast.data.pipeline.save_dataframe")
 @patch("fx_forecast.data.pipeline.preprocess_dataframe")
 @patch("fx_forecast.data.pipeline.validate_dataframe")
-@patch("fx_forecast.data.pipeline.DataFetcher")
 def test_run_pipeline_success(
-    mock_fetcher_cls: MagicMock,
     mock_validate: MagicMock,
     mock_preprocess: MagicMock,
     mock_save: MagicMock,
+    mock_provider: MagicMock,
     sample_dataframe: pd.DataFrame,
 ) -> None:
-    """
-    Pipeline should execute every stage successfully.
-    """
+    """Pipeline should execute every stage successfully."""
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.download.return_value = sample_dataframe
-
+    mock_provider.fetch.return_value = sample_dataframe
     mock_validate.return_value = sample_dataframe
     mock_preprocess.return_value = sample_dataframe
 
     result = run_pipeline(
-        symbol="EURUSD=X",
+        provider=mock_provider,
+        pair="EUR/NGN",
         start="2025-01-01",
         end="2025-01-10",
     )
 
-    fetcher.download.assert_called_once_with(
-        symbol="EURUSD=X",
+    mock_provider.fetch.assert_called_once_with(
+        pair="EUR/NGN",
         start="2025-01-01",
         end="2025-01-10",
-        interval="1d",
     )
 
-    mock_validate.assert_called_once_with(sample_dataframe)
+    mock_validate.assert_called_once_with(
+        sample_dataframe,
+        schema=mock_provider.schema,
+    )
     mock_preprocess.assert_called_once_with(sample_dataframe)
     mock_save.assert_called_once()
 
     pd.testing.assert_frame_equal(result, sample_dataframe)
 
 
-@patch("fx_forecast.data.pipeline.DataFetcher")
 def test_pipeline_propagates_fetch_error(
-    mock_fetcher_cls: MagicMock,
+    mock_provider: MagicMock,
 ) -> None:
-    """
-    Fetch failures should propagate.
-    """
+    """Fetch failures should propagate."""
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.download.side_effect = RuntimeError("Download failed")
+    mock_provider.fetch.side_effect = RuntimeError("Download failed")
 
     with pytest.raises(RuntimeError, match="Download failed"):
         run_pipeline(
-            "EURUSD=X",
-            "2025-01-01",
+            provider=mock_provider,
+            pair="EUR/NGN",
+            start="2025-01-01",
         )
 
 
 @patch("fx_forecast.data.pipeline.validate_dataframe")
-@patch("fx_forecast.data.pipeline.DataFetcher")
 def test_pipeline_propagates_validation_error(
-    mock_fetcher_cls: MagicMock,
     mock_validate: MagicMock,
+    mock_provider: MagicMock,
     sample_dataframe: pd.DataFrame,
 ) -> None:
-    """
-    Validation failures should propagate.
-    """
+    """Validation failures should propagate."""
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.download.return_value = sample_dataframe
-
+    mock_provider.fetch.return_value = sample_dataframe
     mock_validate.side_effect = ValueError("Validation failed")
 
     with pytest.raises(ValueError, match="Validation failed"):
         run_pipeline(
-            "EURUSD=X",
-            "2025-01-01",
+            provider=mock_provider,
+            pair="EUR/NGN",
+            start="2025-01-01",
         )
 
 
 @patch("fx_forecast.data.pipeline.preprocess_dataframe")
 @patch("fx_forecast.data.pipeline.validate_dataframe")
-@patch("fx_forecast.data.pipeline.DataFetcher")
 def test_pipeline_propagates_preprocess_error(
-    mock_fetcher_cls: MagicMock,
     mock_validate: MagicMock,
     mock_preprocess: MagicMock,
+    mock_provider: MagicMock,
     sample_dataframe: pd.DataFrame,
 ) -> None:
-    """
-    Preprocessing failures should propagate.
-    """
+    """Preprocessing failures should propagate."""
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.download.return_value = sample_dataframe
-
+    mock_provider.fetch.return_value = sample_dataframe
     mock_validate.return_value = sample_dataframe
     mock_preprocess.side_effect = ValueError("Preprocess failed")
 
     with pytest.raises(ValueError, match="Preprocess failed"):
         run_pipeline(
-            "EURUSD=X",
-            "2025-01-01",
+            provider=mock_provider,
+            pair="EUR/NGN",
+            start="2025-01-01",
         )
 
 
 @patch("fx_forecast.data.pipeline.save_dataframe")
 @patch("fx_forecast.data.pipeline.preprocess_dataframe")
 @patch("fx_forecast.data.pipeline.validate_dataframe")
-@patch("fx_forecast.data.pipeline.DataFetcher")
 def test_processed_data_is_saved(
-    mock_fetcher_cls: MagicMock,
     mock_validate: MagicMock,
     mock_preprocess: MagicMock,
     mock_save: MagicMock,
+    mock_provider: MagicMock,
     sample_dataframe: pd.DataFrame,
 ) -> None:
-    """
-    Pipeline should save the processed dataframe.
-    """
+    """Pipeline should save the processed dataframe."""
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.download.return_value = sample_dataframe
-
+    mock_provider.fetch.return_value = sample_dataframe
     mock_validate.return_value = sample_dataframe
     mock_preprocess.return_value = sample_dataframe
 
     run_pipeline(
-        symbol="EURUSD=X",
+        provider=mock_provider,
+        pair="EUR/NGN",
         start="2025-01-01",
     )
 
@@ -168,4 +160,5 @@ def test_processed_data_is_saved(
 
     pd.testing.assert_frame_equal(kwargs["df"], sample_dataframe)
 
-    assert kwargs["path"].name == "EURUSD_X.csv"
+    assert isinstance(kwargs["path"], Path)
+    assert kwargs["path"].name == "EUR_NGN.csv"
