@@ -1,0 +1,20 @@
+"""
+Project constants.
+"""
+
+DEFAULT_PAIRS = [
+    "USD/NGN",
+    "EUR/NGN",
+]
+
+DEFAULT_START_DATE = "2015-01-01"
+
+DEFAULT_INTERVAL = "1d"
+
+TRAIN_RATIO = 0.70
+
+VALIDATION_RATIO = 0.15
+
+TEST_RATIO = 0.15
+
+RANDOM_SEED = 42
