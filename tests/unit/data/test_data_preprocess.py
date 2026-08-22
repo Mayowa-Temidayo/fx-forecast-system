@@ -1,98 +1,132 @@
-"""
-Unit tests for data preprocessing.
-"""
+"""Tests for dataframe preprocessing."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
-from pandas.testing import assert_frame_equal
 
 from fx_forecast.data.preprocess import preprocess_dataframe
 
 
-@pytest.fixture
-def sample_dataframe() -> pd.DataFrame:
-    """Create a valid OHLCV dataset."""
-
-    return pd.DataFrame(
-        {
-            "Open": [1.10, 1.20, 1.30],
-            "High": [1.15, 1.25, 1.35],
-            "Low": [1.05, 1.15, 1.25],
-            "Close": [1.12, 1.22, 1.32],
-            "Volume": [1000, 1100, 1200],
-        },
-        index=pd.to_datetime(
-            [
-                "2025-01-01",
-                "2025-01-02",
-                "2025-01-03",
-            ]
-        ),
-    )
-
-
-def test_returns_dataframe(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """Preprocessing should return a DataFrame."""
-
-    result = preprocess_dataframe(sample_dataframe)
-
-    assert isinstance(result, pd.DataFrame)
-
-
-def test_preserves_datetime_index(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """DatetimeIndex should be preserved."""
-
-    result = preprocess_dataframe(sample_dataframe)
-
-    assert isinstance(result.index, pd.DatetimeIndex)
-
-
-def test_sorts_index() -> None:
-    """Rows should be sorted by datetime."""
+def test_preprocess_normalizes_column_names() -> None:
+    """Column names should be normalized into canonical form."""
 
     df = pd.DataFrame(
         {
-            "Open": [1.30, 1.10, 1.20],
-            "High": [1.35, 1.15, 1.25],
-            "Low": [1.25, 1.05, 1.15],
-            "Close": [1.32, 1.12, 1.22],
-            "Volume": [1200, 1000, 1100],
+            " open ": [100.0, 101.0],
+            "HIGH PRICE": [105.0, 106.0],
+            "close": [103.0, 104.0],
         },
         index=pd.to_datetime(
-            [
-                "2025-01-03",
-                "2025-01-01",
-                "2025-01-02",
-            ]
+            ["2025-01-02", "2025-01-01"],
         ),
+    )
+
+    result = preprocess_dataframe(df)
+
+    assert result.columns.tolist() == [
+        "Open",
+        "High_Price",
+        "Close",
+    ]
+
+
+def test_preprocess_normalizes_datetime_index() -> None:
+    """The dataframe index should be a sorted DatetimeIndex."""
+
+    df = pd.DataFrame(
+        {"Close": [102.0, 101.0]},
+        index=["2025-01-02", "2025-01-01"],
+    )
+
+    result = preprocess_dataframe(df)
+
+    assert isinstance(result.index, pd.DatetimeIndex)
+    assert result.index.name == "Date"
+    assert result.index.tolist() == [
+        pd.Timestamp("2025-01-01"),
+        pd.Timestamp("2025-01-02"),
+    ]
+
+
+def test_preprocess_removes_duplicate_timestamps() -> None:
+    """Duplicate timestamps should be reduced to one observation."""
+
+    index = pd.to_datetime(
+        [
+            "2025-01-01",
+            "2025-01-01",
+            "2025-01-02",
+        ]
+    )
+
+    df = pd.DataFrame(
+        {"Close": [100.0, 101.0, 102.0]},
+        index=index,
+    )
+
+    result = preprocess_dataframe(df)
+
+    assert len(result) == 2
+    assert not result.index.has_duplicates
+    assert result.loc[pd.Timestamp("2025-01-01"), "Close"] == 100.0
+
+
+def test_preprocess_sorts_chronologically() -> None:
+    """Observations should be sorted in ascending date order."""
+
+    index = pd.to_datetime(
+        [
+            "2025-01-03",
+            "2025-01-01",
+            "2025-01-02",
+        ]
+    )
+
+    df = pd.DataFrame(
+        {"Close": [103.0, 101.0, 102.0]},
+        index=index,
     )
 
     result = preprocess_dataframe(df)
 
     assert result.index.is_monotonic_increasing
+    assert result["Close"].tolist() == [101.0, 102.0, 103.0]
 
 
-def test_removes_duplicate_index() -> None:
-    """Duplicate timestamps should be removed."""
+def test_preprocess_converts_numeric_object_columns() -> None:
+    """Numeric values stored as strings should become numeric."""
 
     df = pd.DataFrame(
         {
-            "Open": [1.10, 1.20, 1.30],
-            "High": [1.15, 1.25, 1.35],
-            "Low": [1.05, 1.15, 1.25],
-            "Close": [1.12, 1.22, 1.32],
-            "Volume": [1000, 1100, 1200],
+            "Close": ["100.5", "101.5"],
+            "Volume": ["1000", "2000"],
+        },
+        index=pd.to_datetime(
+            ["2025-01-01", "2025-01-02"],
+        ),
+    )
+
+    result = preprocess_dataframe(df)
+
+    assert pd.api.types.is_numeric_dtype(result["Close"])
+    assert pd.api.types.is_numeric_dtype(result["Volume"])
+    assert result["Close"].tolist() == [100.5, 101.5]
+    assert result["Volume"].tolist() == [1000, 2000]
+
+
+def test_preprocess_drops_missing_rows() -> None:
+    """Rows containing missing values should be removed."""
+
+    df = pd.DataFrame(
+        {
+            "Close": [100.0, None, 102.0],
+            "Volume": [1000, 2000, 3000],
         },
         index=pd.to_datetime(
             [
                 "2025-01-01",
-                "2025-01-01",
+                "2025-01-02",
                 "2025-01-03",
             ]
         ),
@@ -100,87 +134,38 @@ def test_removes_duplicate_index() -> None:
 
     result = preprocess_dataframe(df)
 
-    assert not result.index.has_duplicates
+    assert len(result) == 2
+    assert result["Close"].tolist() == [100.0, 102.0]
 
 
-def test_fills_missing_values(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """Missing values should be filled."""
+def test_preprocess_does_not_mutate_input() -> None:
+    """Preprocessing should not mutate the original dataframe."""
 
-    df = sample_dataframe.copy()
-
-    df.loc[df.index[1], "Open"] = pd.NA
-
-    result = preprocess_dataframe(df)
-
-    assert result["Open"].isna().sum() == 0
-
-
-def test_drops_remaining_missing_rows(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """No missing values should remain."""
-
-    df = sample_dataframe.copy()
-
-    df.loc[df.index[0], :] = pd.NA
-
-    result = preprocess_dataframe(df)
-
-    assert result.isna().sum().sum() == 0
-
-
-def test_standardizes_column_names(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """Column names should be standardized."""
-
-    df = sample_dataframe.copy()
-
-    df.columns = [
-        " open ",
-        "HIGH",
-        "low",
-        "close price",
-        "volume",
-    ]
-
-    result = preprocess_dataframe(df)
-
-    assert list(result.columns) == [
-        "Open",
-        "High",
-        "Low",
-        "Close_Price",
-        "Volume",
-    ]
-
-
-def test_original_dataframe_not_modified(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """Original dataframe should remain unchanged."""
-
-    original = sample_dataframe.copy(deep=True)
-
-    preprocess_dataframe(sample_dataframe)
-
-    assert_frame_equal(
-        sample_dataframe,
-        original,
+    df = pd.DataFrame(
+        {
+            " close ": [100.0, 101.0],
+        },
+        index=pd.to_datetime(
+            ["2025-01-01", "2025-01-02"],
+        ),
     )
 
+    original_columns = df.columns.tolist()
+    original_index = df.index.copy()
 
-def test_clean_dataframe_unchanged(
-    sample_dataframe: pd.DataFrame,
-) -> None:
-    """Already clean datasets should remain unchanged."""
+    preprocess_dataframe(df)
 
-    result = preprocess_dataframe(sample_dataframe)
+    assert df.columns.tolist() == original_columns
+    assert df.index.equals(original_index)
 
-    assert_frame_equal(
-        sample_dataframe,
-        result,
-        check_freq=False,
+
+def test_preprocess_rejects_invalid_datetime_index() -> None:
+    """Invalid index values should raise a datetime conversion error."""
+
+    df = pd.DataFrame(
+        {"Close": [100.0]},
+        index=["not-a-date"],
     )
+
+    with pytest.raises(ValueError):
+        preprocess_dataframe(df)

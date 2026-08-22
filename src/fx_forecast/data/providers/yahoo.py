@@ -14,6 +14,11 @@ from fx_forecast.data.validate import DataSchema
 class YahooFXProvider(FXProvider):
     """Fetch FX data from Yahoo Finance."""
 
+    def __init__(self, interval: str = "1d") -> None:
+        """Initialize the provider with a download interval."""
+
+        self.interval = interval
+
     @property
     def schema(self) -> DataSchema:
         """Return the Yahoo Finance OHLCV schema."""
@@ -54,7 +59,7 @@ class YahooFXProvider(FXProvider):
             symbol,
             start=start,
             end=end,
-            interval="1d",
+            interval=self.interval,
             progress=False,
             auto_adjust=True,
         )

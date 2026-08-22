@@ -11,6 +11,7 @@ from fx_forecast.data.providers.yahoo import YahooFXProvider
 @pytest.fixture
 def yahoo_dataframe() -> pd.DataFrame:
     """Return representative Yahoo Finance data."""
+
     index = pd.date_range("2025-01-01", periods=2, freq="D")
 
     return pd.DataFrame(
@@ -73,6 +74,31 @@ def test_fetch_eur_ngn(
         start="2025-01-01",
         end="2025-01-03",
         interval="1d",
+        progress=False,
+        auto_adjust=True,
+    )
+
+
+def test_fetch_uses_custom_interval(
+    yahoo_dataframe: pd.DataFrame,
+) -> None:
+    """Yahoo downloads should use the configured interval."""
+
+    with patch(
+        "fx_forecast.data.providers.yahoo.yf.download",
+        return_value=yahoo_dataframe,
+    ) as mock_download:
+        YahooFXProvider(interval="1h").fetch(
+            pair="USD/NGN",
+            start="2025-01-01",
+            end="2025-01-03",
+        )
+
+    mock_download.assert_called_once_with(
+        "USDNGN=X",
+        start="2025-01-01",
+        end="2025-01-03",
+        interval="1h",
         progress=False,
         auto_adjust=True,
     )
