@@ -6,27 +6,23 @@ import pandas as pd
 
 from fx_forecast.utils.logger import logger
 
+CANONICAL_COLUMN_ORDER = (
+    "Open",
+    "High",
+    "Low",
+    "Close",
+    "Volume",
+)
+
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and canonicalize a validated dataframe.
-
-    The preprocessing stage is provider-agnostic.
-
-    The canonical dataframe produced here has:
-    - a DatetimeIndex;
-    - an index named ``Date``;
-    - chronologically sorted observations;
-    - unique timestamps;
-    - normalized column names;
-    - numeric-looking object columns converted to numeric;
-    - no missing values.
-    """
+    """Clean and canonicalize a validated dataframe."""
 
     rows_before = len(df)
 
     result = df.copy()
 
-    # Normalize the index.
+    # Normalize the dataframe index.
     if not isinstance(result.index, pd.DatetimeIndex):
         result.index = pd.to_datetime(result.index, errors="raise")
 
@@ -40,15 +36,13 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         .str.title()
     )
 
-    # Sort chronologically.
+    # Sort observations chronologically.
     result = result.sort_index()
 
-    # Remove duplicate timestamps while keeping the first observation.
+    # Remove duplicate timestamps.
     result = result.loc[~result.index.duplicated(keep="first")]
 
-    # Convert numeric-looking object columns to numeric.
-    #
-    # Non-numeric columns such as Pair remain unchanged.
+    # Convert numeric-looking object columns.
     for column in result.columns:
         if result[column].dtype == "object":
             try:
@@ -56,12 +50,22 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             except (TypeError, ValueError):
                 pass
 
-    # Do not invent financial observations through mean/median/mode
-    # imputation. Rows containing missing values are removed.
+    # Remove rows containing missing values.
     result = result.dropna()
+
+    # Enforce the canonical market-column order when available.
+    ordered_columns = [
+        column for column in CANONICAL_COLUMN_ORDER if column in result.columns
+    ]
+
+    remaining_columns = [
+        column for column in result.columns if column not in ordered_columns
+    ]
+
+    result = result.loc[:, ordered_columns + remaining_columns]
 
     rows_after = len(result)
 
-    logger.success(f"Preprocessing complete ({rows_before} -> {rows_after} rows).")
+    logger.success(f"Preprocessing complete ({rows_before} → {rows_after} rows).")
 
     return result

@@ -24,11 +24,11 @@ def test_preprocess_normalizes_column_names() -> None:
 
     result = preprocess_dataframe(df)
 
-    assert result.columns.tolist() == [
+    assert set(result.columns) == {
         "Open",
         "High_Price",
         "Close",
-    ]
+    }
 
 
 def test_preprocess_normalizes_datetime_index() -> None:
@@ -169,3 +169,30 @@ def test_preprocess_rejects_invalid_datetime_index() -> None:
 
     with pytest.raises(ValueError):
         preprocess_dataframe(df)
+
+
+def test_preprocess_enforces_canonical_column_order() -> None:
+    """Market columns should follow the canonical project order."""
+
+    df = pd.DataFrame(
+        {
+            "Close": [103.0, 104.0],
+            "Volume": [1000, 1100],
+            "Open": [100.0, 101.0],
+            "Low": [99.0, 100.0],
+            "High": [105.0, 106.0],
+        },
+        index=pd.to_datetime(
+            ["2025-01-01", "2025-01-02"],
+        ),
+    )
+
+    result = preprocess_dataframe(df)
+
+    assert result.columns.tolist() == [
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Volume",
+    ]
