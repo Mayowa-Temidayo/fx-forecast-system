@@ -36,7 +36,9 @@ def test_preprocess_normalizes_datetime_index() -> None:
 
     df = pd.DataFrame(
         {"Close": [102.0, 101.0]},
-        index=["2025-01-02", "2025-01-01"],
+        index=pd.Index(
+            ["2025-01-02", "2025-01-01"],
+        ),
     )
 
     result = preprocess_dataframe(df)
@@ -164,7 +166,7 @@ def test_preprocess_rejects_invalid_datetime_index() -> None:
 
     df = pd.DataFrame(
         {"Close": [100.0]},
-        index=["not-a-date"],
+        index=pd.Index(["not-a-date"]),
     )
 
     with pytest.raises(ValueError):

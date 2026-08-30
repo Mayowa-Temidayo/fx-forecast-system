@@ -11,27 +11,19 @@ from fx_forecast.utils.logger import logger
 TARGET_COLUMN = "target"
 
 EXCLUDED_COLUMNS = {
-    TARGET_COLUMN,
+    "target",
+    "target_3d",
+    "target_5d",
+    "future_return_1d",
+    "future_return_3d",
+    "future_return_5d",
 }
 
 
 def select_features(
     df: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """
-    Split an engineered dataset into a feature matrix (X)
-    and target vector (y).
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Engineered feature dataset.
-
-    Returns
-    -------
-    tuple[pd.DataFrame, pd.Series]
-        Feature matrix and target vector.
-    """
+    """Split engineered data into features and target."""
 
     if df.empty:
         raise ValueError("Input DataFrame is empty.")
@@ -39,7 +31,9 @@ def select_features(
     if TARGET_COLUMN not in df.columns:
         raise ValueError(f"Missing target column: '{TARGET_COLUMN}'")
 
-    X = df.drop(columns=list(EXCLUDED_COLUMNS)).copy()
+    excluded = [column for column in EXCLUDED_COLUMNS if column in df.columns]
+
+    X = df.drop(columns=excluded).copy()
     y = df.loc[:, TARGET_COLUMN].copy()
 
     if X.empty:
