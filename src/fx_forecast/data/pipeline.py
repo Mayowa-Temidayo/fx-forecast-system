@@ -17,10 +17,11 @@ def run_pipeline(
     pair: str,
     start: str,
     end: str | None = None,
+    provider_name: str = "unknown",
 ) -> pd.DataFrame:
     """Fetch, validate, preprocess and save FX market data."""
 
-    logger.info(f"Starting pipeline for {pair}")
+    logger.info(f"Starting pipeline for {provider_name}/{pair}")
 
     df = provider.fetch(
         pair=pair,
@@ -35,13 +36,16 @@ def run_pipeline(
 
     df = preprocess_dataframe(df)
 
-    output_path = PROCESSED_DATA_DIR / f"{pair.replace('/', '_')}.csv"
+    provider_dir = PROCESSED_DATA_DIR / provider_name
+    provider_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = provider_dir / f"{pair.replace('/', '_')}.csv"
 
     save_dataframe(
         df=df,
         path=output_path,
     )
 
-    logger.success(f"Pipeline completed for {pair}")
+    logger.success(f"Pipeline completed for {provider_name}/{pair}")
 
     return df
