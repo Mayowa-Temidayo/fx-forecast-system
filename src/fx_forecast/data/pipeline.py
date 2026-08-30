@@ -39,7 +39,7 @@ def run_pipeline(
     provider_dir = PROCESSED_DATA_DIR / provider_name
     provider_dir.mkdir(parents=True, exist_ok=True)
 
-    output_path = provider_dir / f"{pair.replace('/', '_')}.csv"
+    output_path = provider_dir / pair.replace("/", "_")
 
     save_dataframe(
         df=df,

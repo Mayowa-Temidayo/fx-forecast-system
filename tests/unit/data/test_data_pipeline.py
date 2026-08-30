@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
+from fx_forecast.config.paths import PROCESSED_DATA_DIR
 from fx_forecast.data.pipeline import run_pipeline
 from fx_forecast.data.providers.base import FXProvider
 
@@ -60,6 +61,7 @@ def test_run_pipeline_success(
         pair="EUR/NGN",
         start="2025-01-01",
         end="2025-01-10",
+        provider_name="yahoo",
     )
 
     mock_provider.fetch.assert_called_once_with(
@@ -72,8 +74,13 @@ def test_run_pipeline_success(
         sample_dataframe,
         schema=mock_provider.schema,
     )
+
     mock_preprocess.assert_called_once_with(sample_dataframe)
-    mock_save.assert_called_once()
+
+    mock_save.assert_called_once_with(
+        df=sample_dataframe,
+        path=PROCESSED_DATA_DIR / "yahoo" / "EUR_NGN",
+    )
 
     pd.testing.assert_frame_equal(result, sample_dataframe)
 
@@ -154,6 +161,7 @@ def test_processed_data_is_saved(
         provider=mock_provider,
         pair="EUR/NGN",
         start="2025-01-01",
+        provider_name="cbn",
     )
 
     _, kwargs = mock_save.call_args
@@ -161,4 +169,4 @@ def test_processed_data_is_saved(
     pd.testing.assert_frame_equal(kwargs["df"], sample_dataframe)
 
     assert isinstance(kwargs["path"], Path)
-    assert kwargs["path"].name == "EUR_NGN.csv"
+    assert kwargs["path"] == PROCESSED_DATA_DIR / "cbn" / "EUR_NGN"
