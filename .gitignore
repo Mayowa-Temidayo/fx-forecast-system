@@ -32,7 +32,7 @@ htmlcov/
 mlruns/
 
 # Models
-models/
+/models/
 *.pkl
 *.joblib
 *.keras
